@@ -1,0 +1,30 @@
+{
+  "name": "pauta-juridica",
+  "version": "0.1.0",
+  "description": "Esteira de produção de conteúdo previdenciário: lê notícias, gera pauta/roteiro e organiza um calendário editorial com cadência estável.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node scripts/migrate-and-start.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "ingest": "node -e \"import('./src/services/ingest.js').then(m=>m.runIngestion())\""
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "openai": "^4.77.0",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0"
+  }
+}

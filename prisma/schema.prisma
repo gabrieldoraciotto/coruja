@@ -1,0 +1,70 @@
+// Prisma schema — banco de dados da plataforma.
+// Fluxo: Source (fonte) -> Article (notícia) -> Draft (roteiro) -> agendado num dia (scheduledDate)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Fonte de notícias (um feed RSS).
+model Source {
+  id        String    @id @default(cuid())
+  name      String
+  feedUrl   String    @unique
+  type      String // "tribunal" | "imprensa_juridica" | "legislativo"
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  articles  Article[]
+}
+
+// Notícia coletada de um feed.
+model Article {
+  id              String    @id @default(cuid())
+  source          Source    @relation(fields: [sourceId], references: [id])
+  sourceId        String
+  title           String
+  link            String    @unique
+  summary         String?
+  publishedAt     DateTime?
+  fetchedAt       DateTime  @default(now())
+  status          String    @default("novo") // "novo" | "relevante" | "descartado" | "lida"
+  relevanceScore  Int?
+  relevanceReason String?
+  isNew           Boolean   @default(false) // marca "nova notícia": só o último lote coletado fica true.
+  drafts          Draft[]
+
+  @@index([status])
+}
+
+// Roteiro gerado a partir de uma notícia.
+// O agendamento agora é manual: scheduledDate guarda o dia escolhido no calendário
+// (null = ainda na fila). Vários roteiros podem cair no mesmo dia (sem limite por dia).
+model Draft {
+  id            String    @id @default(cuid())
+  article       Article?  @relation(fields: [articleId], references: [id])
+  articleId     String?   // null quando o roteiro vem de pauta própria (tema livre).
+  topic         String?   // tema livre da pauta própria. null quando vem de notícia.
+  format        String    @default("reel") // "reel" | "carrossel"
+  hook          String
+  script        String
+  caption       String
+  status        String    @default("rascunho") // rascunho | aprovado | rejeitado | agendado | publicado
+  scheduledDate DateTime? // dia agendado (UTC, meio-dia). null = na fila de aprovados.
+  oabConforme   Boolean?  // resultado da verificação OAB. null = ainda não verificado.
+  oabAlertas    String?   // JSON com a lista de avisos da OAB (ex.: "[]" ou [{problema,sugestao}]).
+  createdAt     DateTime  @default(now())
+
+  @@index([status])
+  @@index([scheduledDate])
+}
+
+// Configurações editáveis pela própria plataforma (chave-valor).
+// Usado para guardar os dias da semana de publicação (cadenceDays).
+model Setting {
+  key   String @id
+  value String
+}
