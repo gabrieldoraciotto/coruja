@@ -12,6 +12,8 @@ export const config = {
   cadenceDays: cadenceFromEnv || [1, 3, 5],
   weeksAhead: parseInt(process.env.WEEKS_AHEAD || "4", 10),
   relevanceThreshold: parseInt(process.env.RELEVANCE_THRESHOLD || "60", 10),
+  // Tema padrão do canal (o visitante pode trocar na tela de ajustes).
+  defaultNiche: process.env.DEFAULT_NICHE || "tecnologia e inteligência artificial",
 
   // ── Provedor de IA ────────────────────────────────────────────────────
   // Compatível com qualquer API no formato OpenAI. Troque AI_BASE_URL e os
@@ -44,7 +46,7 @@ export const config = {
     apiKey: process.env.RESEND_API_KEY,
     from: process.env.REMINDER_FROM,
     to: process.env.REMINDER_TO,
-    appUrl: process.env.APP_URL || "https://pauta-juridica-web.vercel.app",
+    appUrl: process.env.APP_URL || "http://localhost:3000",
   },
 };
 
@@ -55,19 +57,19 @@ export const config = {
 // estas existam com o nome certo a cada boot (e conserta acento bugado).
 export const seedSources = [
   {
-    name: "Google Notícias — Previdência",
+    name: "Google Notícias — Tecnologia e IA",
     feedUrl:
-      "https://news.google.com/rss/search?q=INSS%20OR%20aposentadoria%20OR%20BPC%20OR%20%22auxilio-doenca%22%20OR%20%22pensao%20por%20morte%22&hl=pt-BR&gl=BR&ceid=BR:pt-419",
+      "https://news.google.com/rss/search?q=%22intelig%C3%AAncia%20artificial%22%20OR%20tecnologia%20OR%20startups&hl=pt-BR&gl=BR&ceid=BR:pt-419",
     type: "agregador",
   },
   {
-    name: "JOTA",
-    feedUrl: "https://www.jota.info/feed",
-    type: "imprensa_juridica",
+    name: "TecMundo",
+    feedUrl: "https://rss.tecmundo.com.br/feed",
+    type: "imprensa",
   },
   {
-    name: "Consultor Jurídico (Conjur)",
-    feedUrl: "https://www.conjur.com.br/rss.xml",
-    type: "imprensa_juridica",
+    name: "Canaltech",
+    feedUrl: "https://canaltech.com.br/rss/",
+    type: "imprensa",
   },
 ];

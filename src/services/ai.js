@@ -52,21 +52,20 @@ function parseAiJson(text) {
 }
 
 // ── 1. Triagem de relevância ──────────────────────────────────────────────
-export async function triageArticle({ title, summary }) {
-  const prompt = `Você faz a triagem de notícias para uma advogada de DIREITO PREVIDENCIÁRIO que produz conteúdo educativo no Instagram.
+export async function triageArticle({ title, summary, nicho }) {
+  const prompt = `Você faz a triagem de notícias para um canal que produz conteúdo educativo no Instagram sobre: ${nicho}.
 
 Avalie a notícia abaixo e responda APENAS com um JSON, sem texto antes ou depois, no formato:
 {"score": <0-100>, "reason": "<uma frase curta>"}
 
 Critérios de pontuação alta (score alto):
-- Mudanças em leis previdenciárias, INSS, aposentadoria, benefícios (auxílio-doença, BPC/LOAS, pensão, etc.).
-- Teses, súmulas ou decisões do STF/STJ/TNU que afetem segurados.
-- Novas Instruções Normativas do INSS, regras de transição da EC 103/2019.
-- Qualquer coisa que um segurado comum precise saber e que renda um bom vídeo curto.
+- Relação direta com o tema do canal (${nicho}) e efeito prático para o público.
+- Novidades, mudanças, lançamentos ou decisões que esse público precise saber.
+- Assunto que rende um bom vídeo curto ou carrossel educativo.
 
 Critérios de pontuação baixa (score baixo):
-- Assuntos sem relação com previdência (penal, tributário puro, eleitoral, etc.).
-- Notícia institucional sem efeito prático para o segurado.
+- Assuntos sem relação com o tema do canal.
+- Notícia institucional ou burocrática, sem efeito prático para o público.
 
 NOTÍCIA:
 Título: ${title}
@@ -93,12 +92,12 @@ Resumo: ${summary || "(sem resumo)"}`;
 }
 
 // ── 2. Geração de roteiro ─────────────────────────────────────────────────
-const REGRAS_OAB = `REGRAS OBRIGATÓRIAS DE PUBLICIDADE DA OAB (Provimento 205/2021 e CED). NÃO PODEM SER VIOLADAS:
-- Tom estritamente educativo e informativo. Nunca prometer resultado nem captar clientela.
-- Enquadramento em terceira pessoa / caso hipotético. NUNCA "entre em contato", "agende sua consulta", "fale comigo", "me chame no direct" ou qualquer chamada para ação de contato.
-- Proibido mercantilizar a advocacia, anunciar valores, sugerir urgência comercial ou se autopromover ("melhor advogada", "especialista nº 1", etc.).
-- Linguagem acessível ao leigo, sem prometer que a pessoa "tem direito" — explicar que cada caso depende de análise.
-- Pode orientar o público a "buscar orientação de um advogado de confiança", de forma genérica, sem direcionar a si mesma.`;
+const REGRAS_CONTEUDO = `REGRAS OBRIGATÓRIAS DE CONTEÚDO HONESTO. NÃO PODEM SER VIOLADAS:
+- Tom educativo e informativo. Nunca prometer resultado, ganho ou cura.
+- NÃO inventar fatos, números, estatísticas, fontes ou citações. Sem certeza, falar de forma genérica.
+- Sem clickbait enganoso: o que o gancho promete, o conteúdo precisa entregar.
+- Em temas sensíveis (saúde, jurídico, financeiro), nada de conselho individualizado — orientar a procurar um profissional da área.
+- Linguagem acessível ao público leigo.`;
 
 // Alvos de duração do vídeo. Cada opção calibra o tamanho do roteiro.
 const DURACOES = {
@@ -112,17 +111,17 @@ function buildFormatoDuracao(format, duration) {
   if (format === "carrossel") {
     return `Formato: CARROSSEL de Instagram com ${dur.cartoes} cartões (duração-alvo ${dur.label}). No campo "script", escreva o conteúdo de cada cartão separado por "---", começando pelo cartão de capa. Calibre a quantidade de texto para caber bem em ${dur.cartoes} cartões.`;
   }
-  return `Formato: REEL / vídeo curto, com duração-alvo de aproximadamente ${dur.segundos} segundos de fala (vídeo ${dur.label}). No campo "script", escreva a fala em ${dur.blocos} blocos curtos, como a Dra. Sara falaria para a câmera, ajustando a quantidade de texto para caber nesse tempo de vídeo.`;
+  return `Formato: REEL / vídeo curto, com duração-alvo de aproximadamente ${dur.segundos} segundos de fala (vídeo ${dur.label}). No campo "script", escreva a fala em ${dur.blocos} blocos curtos, como o apresentador falaria para a câmera, ajustando a quantidade de texto para caber nesse tempo de vídeo.`;
 }
 
 // Monta o bloco de "origem" do roteiro nos prompts: notícia (quando vem de uma
 // matéria) ou tema livre (pauta própria, sem notícia).
 function buildOrigem({ title, summary, link, topic }) {
   if (topic) {
-    return `TEMA (definido pela advogada, sem notícia de origem):
+    return `TEMA (definido pelo criador, sem notícia de origem):
 ${topic}
 
-IMPORTANTE: trate o tema de forma geral e educativa. NÃO invente números de tema repetitivo, súmula, número de processo, percentuais, prazos, valores ou datas específicas. Se algo depender de número exato, fale de forma genérica e oriente a confirmar com um profissional.`;
+IMPORTANTE: trate o tema de forma geral e educativa. NÃO invente números, estatísticas, fontes, percentuais, prazos, valores ou datas específicas. Se algo depender de dado exato, fale de forma genérica.`;
   }
   return `NOTÍCIA:
 Título: ${title}
@@ -132,12 +131,12 @@ Fonte: ${link}`;
 
 // Gera um roteiro educativo a partir de um TEMA livre (pauta própria), sem
 // notícia de origem. Mesma estrutura de saída do generateScript.
-export async function generateFromTopic({ topic, format = "reel", duration = "medio" }) {
+export async function generateFromTopic({ topic, nicho, format = "reel", duration = "medio" }) {
   const formatoInstrucao = buildFormatoDuracao(format, duration);
 
-  const prompt = `Você é roteirista de conteúdo jurídico para uma advogada de DIREITO PREVIDENCIÁRIO no Brasil. A advogada quer um roteiro educativo sobre o tema indicado abaixo.
+  const prompt = `Você é roteirista de um canal de conteúdo educativo no Instagram sobre: ${nicho}. O criador do canal quer um roteiro educativo sobre o tema indicado abaixo.
 
-${REGRAS_OAB}
+${REGRAS_CONTEUDO}
 
 ${formatoInstrucao}
 
@@ -149,8 +148,8 @@ Responda APENAS com um JSON, sem texto antes ou depois:
 }
 
 Regras de conteúdo (IMPORTANTES):
-- Trate o tema de forma GERAL e educativa. NÃO invente números de tema repetitivo, súmula, número de processo, percentuais, prazos, valores ou datas específicas. Se algo depender de número exato, fale de forma genérica e oriente a confirmar com um profissional.
-- Não prometa resultado nem afirme que a pessoa "tem direito" — explique que cada caso depende de análise.
+- Trate o tema de forma GERAL e educativa. NÃO invente números, estatísticas, fontes, percentuais, prazos, valores ou datas específicas. Se algo depender de dado exato, fale de forma genérica.
+- Não prometa resultado nem ganho garantido.
 - Respeite a duração-alvo indicada acima.
 - Português do Brasil, claro e humano.
 
@@ -177,14 +176,15 @@ export async function generateScript({
   title,
   summary,
   link,
+  nicho,
   format = "reel",
   duration = "medio",
 }) {
   const formatoInstrucao = buildFormatoDuracao(format, duration);
 
-  const prompt = `Você é roteirista de conteúdo jurídico para uma advogada de DIREITO PREVIDENCIÁRIO no Brasil. A partir da notícia abaixo, escreva um roteiro educativo.
+  const prompt = `Você é roteirista de um canal de conteúdo educativo no Instagram sobre: ${nicho}. A partir da notícia abaixo, escreva um roteiro educativo.
 
-${REGRAS_OAB}
+${REGRAS_CONTEUDO}
 
 ${formatoInstrucao}
 
@@ -196,7 +196,7 @@ Responda APENAS com um JSON, sem texto antes ou depois:
 }
 
 Regras de conteúdo:
-- Base-se SOMENTE no que a notícia diz. Não invente números de tema, súmula, processo, percentuais ou prazos que não estejam no texto.
+- Base-se SOMENTE no que a notícia diz. Não invente números, estatísticas ou fontes que não estejam no texto.
 - Respeite a duração-alvo indicada acima: o tamanho do roteiro deve ser coerente com o tempo de vídeo pedido.
 - Se a notícia for vaga, mantenha o roteiro em termos gerais e oriente o público a confirmar com um profissional.
 - Português do Brasil, claro e humano.
@@ -223,15 +223,16 @@ Fonte: ${link}`;
   };
 }
 
-// ── 3. Verificação de conformidade com a OAB ──────────────────────────────
-// Relê o roteiro à luz das regras de publicidade e aponta possíveis problemas.
-// É um APOIO, não um carimbo jurídico — a palavra final é sempre da advogada.
-export async function checkOAB({ hook, script, caption }) {
-  const prompt = `Você é revisor de conformidade com as REGRAS DE PUBLICIDADE DA OAB. Analise o conteúdo de um post de Instagram de uma advogada de DIREITO PREVIDENCIÁRIO e diga se ele respeita as regras.
+// ── 3. Selo de qualidade do conteúdo ──────────────────────────────────────
+// Relê o roteiro à luz das regras de conteúdo honesto e aponta possíveis
+// problemas. É um APOIO — a palavra final é sempre do criador.
+// (Nome da função preservado do projeto-mãe por compatibilidade de rotas.)
+export async function checkOAB({ hook, script, caption, nicho }) {
+  const prompt = `Você é revisor de qualidade de conteúdo. Analise o post de Instagram de um canal sobre ${nicho} e diga se ele respeita as regras.
 
-${REGRAS_OAB}
+${REGRAS_CONTEUDO}
 
-Procure por qualquer trecho que possa violar as regras: promessa ou garantia de resultado; captação de clientela; chamada para contato ("entre em contato", "agende", "chame no direct", etc.); mercantilização (preços, urgência comercial); autopromoção ("melhor", "especialista nº 1"); ou afirmar que a pessoa "tem direito" sem ressalva de análise do caso.
+Procure por qualquer trecho que possa violar as regras: promessa ou garantia de resultado, ganho ou cura; fato, número, estatística ou fonte que pareça inventado; clickbait que o conteúdo não cumpre; conselho individualizado em tema sensível (saúde, jurídico, financeiro) sem orientar a procurar um profissional.
 
 Responda APENAS com um JSON, sem texto antes ou depois:
 {
@@ -241,7 +242,7 @@ Responda APENAS com um JSON, sem texto antes ou depois:
   ]
 }
 
-Se estiver tudo certo, devolva "conforme": true e "alertas": []. Seja criterioso, mas não invente problema onde não há: conteúdo educativo, em terceira pessoa, que oriente buscar um advogado de confiança de forma genérica, é permitido.
+Se estiver tudo certo, devolva "conforme": true e "alertas": []. Seja criterioso, mas não invente problema onde não há: conteúdo educativo, honesto e em tom geral é permitido.
 
 CONTEÚDO:
 Gancho: ${hook}
@@ -269,23 +270,25 @@ Legenda: ${caption}`;
   };
 }
 
-// Roda a verificação da OAB e devolve os campos já no formato para salvar no
-// roteiro: oabConforme (bool) e oabAlertas (JSON em texto).
-export async function evaluateOab({ hook, script, caption }) {
-  const res = await checkOAB({ hook, script, caption });
+// Roda o selo de qualidade e devolve os campos já no formato para salvar no
+// roteiro: oabConforme (bool) e oabAlertas (JSON em texto) — nomes de coluna
+// herdados do projeto-mãe.
+export async function evaluateOab({ hook, script, caption, nicho }) {
+  const res = await checkOAB({ hook, script, caption, nicho });
   return {
     oabConforme: res.conforme,
     oabAlertas: JSON.stringify(res.alertas || []),
   };
 }
 
-// ── 4. Versão corrigida (ajusta os pontos apontados pela OAB) ──────────────
+// ── 4. Versão corrigida (ajusta os pontos do selo de qualidade) ────────────
 // Reescreve o roteiro corrigindo os alertas da verificação, mantendo tema,
 // formato e duração aproximada. Devolve { hook, script, caption }.
 export async function generateCorrected({
   title,
   summary,
   link,
+  nicho,
   topic = "",
   format = "reel",
   hook = "",
@@ -297,9 +300,9 @@ export async function generateCorrected({
     .map((a, i) => `${i + 1}. ${a.problema}${a.sugestao ? ` (sugestão: ${a.sugestao})` : ""}`)
     .join("\n");
 
-  const prompt = `Você é roteirista de conteúdo jurídico para uma advogada de DIREITO PREVIDENCIÁRIO no Brasil. Abaixo está um roteiro que apresentou possíveis violações às regras de publicidade da OAB. Reescreva o roteiro CORRIGINDO esses pontos, mantendo o mesmo tema, o mesmo formato e a duração aproximada.
+  const prompt = `Você é roteirista de um canal de conteúdo educativo no Instagram sobre: ${nicho}. Abaixo está um roteiro que apresentou possíveis problemas na verificação de qualidade. Reescreva o roteiro CORRIGINDO esses pontos, mantendo o mesmo tema, o mesmo formato e a duração aproximada.
 
-${REGRAS_OAB}
+${REGRAS_CONTEUDO}
 
 PONTOS A CORRIGIR (apontados na verificação):
 ${listaAlertas || "(nenhum ponto específico — apenas garanta total conformidade com as regras acima)"}
@@ -312,7 +315,7 @@ Responda APENAS com um JSON, sem texto antes ou depois:
 }
 
 Regras de conteúdo:
-- Corrija os pontos apontados sem inventar fatos novos. Não acrescente números de tema, súmula, processo, percentuais ou prazos que não estavam no original.
+- Corrija os pontos apontados sem inventar fatos novos. Não acrescente números, estatísticas ou fontes que não estavam no original.
 - Mantenha o conteúdo educativo e em português do Brasil, claro e humano.
 
 ${buildOrigem({ title, summary, link, topic })}
@@ -342,10 +345,11 @@ Legenda: ${caption}`;
 // ── 5. Regeneração de UMA parte do roteiro ────────────────────────────────
 // Reescreve só o gancho, só o roteiro (com duração) ou só a legenda, mantendo
 // coerência com as outras partes (que vêm no parâmetro). Não salva nada e não
-// roda OAB — só devolve o novo texto da parte pedida: { hook } | { script } |
-// { caption }. A verificação da OAB acontece quando a edição é salva.
+// roda o selo — só devolve o novo texto da parte pedida: { hook } | { script } |
+// { caption }. O selo de qualidade roda quando a edição é salva.
 export async function regeneratePart({
   part,
+  nicho,
   title,
   summary,
   link,
@@ -376,15 +380,15 @@ export async function regeneratePart({
     )} Mantenha coerência com o gancho e a legenda atuais. NÃO reescreva o gancho nem a legenda.`;
   }
 
-  const prompt = `Você é roteirista de conteúdo jurídico para uma advogada de DIREITO PREVIDENCIÁRIO no Brasil. ${instrucao}
+  const prompt = `Você é roteirista de um canal de conteúdo educativo no Instagram sobre: ${nicho}. ${instrucao}
 
-${REGRAS_OAB}
+${REGRAS_CONTEUDO}
 
 Responda APENAS com um JSON, sem texto antes ou depois:
 { "${campo}": "<novo conteúdo>" }
 
 Regras de conteúdo:
-- Base-se SOMENTE na origem indicada. Não invente números de tema, súmula, processo, percentuais ou prazos que não estejam no texto.
+- Base-se SOMENTE na origem indicada. Não invente números, estatísticas ou fontes que não estejam na origem.
 - Português do Brasil, claro e humano.
 
 ${buildOrigem({ title, summary, link, topic })}
@@ -411,19 +415,19 @@ Legenda: ${caption}`;
   return { [campo]: String(valor) };
 }
 
-// ── Explicação de um tema/data (para a advogada ler antes de gerar) ────────
-// Não é roteiro: é um resumo educativo do assunto, para a Sara decidir se vale
-// virar conteúdo. Mantém a trava anti-invenção (geral, sem número/data inventados).
-export async function explainTopic({ topic }) {
-  const prompt = `Você é um assistente de DIREITO PREVIDENCIÁRIO no Brasil. Explique, de forma clara e educativa, PARA A PRÓPRIA ADVOGADA (que vai decidir se o assunto vale virar conteúdo), o seguinte tema ou data:
+// ── Explicação de um tema (para o criador ler antes de gerar) ──────────────
+// Não é roteiro: é um resumo educativo do assunto, para o criador decidir se
+// vale virar conteúdo. Mantém a trava anti-invenção (geral, sem dado inventado).
+export async function explainTopic({ topic, nicho }) {
+  const prompt = `Você é assistente de um canal de conteúdo educativo sobre: ${nicho}. Explique, de forma clara e educativa, PARA O CRIADOR DO CANAL (que vai decidir se o assunto vale virar conteúdo), o seguinte tema:
 
 "${topic}"
 
-Escreva de 2 a 4 parágrafos curtos cobrindo: o que é, o que acontece / como funciona, e por que é relevante para o segurado.
+Escreva de 2 a 4 parágrafos curtos cobrindo: o que é, o que acontece / como funciona, e por que é relevante para o público do canal.
 
 Regras:
-- Trate o assunto de forma GERAL. NÃO invente números de tema repetitivo, súmula, número de processo, percentuais, prazos, valores ou datas específicas. Se algo depender de número exato, fale de forma genérica.
-- Português do Brasil, claro e direto. Isto NÃO é um roteiro de post — é uma explicação para a advogada entender o assunto antes de decidir.
+- Trate o assunto de forma GERAL. NÃO invente números, estatísticas, fontes, percentuais, prazos, valores ou datas específicas. Se algo depender de dado exato, fale de forma genérica.
+- Português do Brasil, claro e direto. Isto NÃO é um roteiro de post — é uma explicação para o criador entender o assunto antes de decidir.
 - Responda apenas com o texto da explicação, sem título e sem marcadores.`;
 
   const resp = await withRetry(() =>
@@ -435,3 +439,4 @@ Regras:
   );
   return { explanation: extractText(resp).trim() };
 }
+

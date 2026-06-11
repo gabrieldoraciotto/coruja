@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { getCadenceDays } from "../services/settings.js";
 import { checkOAB, evaluateOab, generateCorrected, generateFromTopic, explainTopic, regeneratePart } from "../services/ai.js";
+import { getNiche } from "../services/niche.js";
 
 export const draftsRouter = Router();
 
@@ -22,15 +23,16 @@ draftsRouter.post("/from-topic", async (req, res) => {
   const topic = String(req.body?.topic || "").trim();
   if (!topic) return res.status(400).json({ error: "informe o tema do roteiro" });
   const format = req.body?.format === "carrossel" ? "carrossel" : "reel";
+  const nicho = await getNiche();
 
   try {
-    const { hook, script, caption } = await generateFromTopic({ topic, format });
+    const { hook, script, caption } = await generateFromTopic({ topic, format, nicho });
     const draft = await prisma.draft.create({
       data: { topic, format, hook, script, caption },
     });
     // Verificação automática da OAB (não bloqueia: se a IA falhar, segue sem o selo).
     try {
-      const oab = await evaluateOab({ hook, script, caption });
+      const oab = await evaluateOab({ hook, script, caption, nicho });
       const comOab = await prisma.draft.update({ where: { id: draft.id }, data: oab });
       return res.status(201).json(comOab);
     } catch (e) {
@@ -48,7 +50,7 @@ draftsRouter.post("/explain-topic", async (req, res) => {
   const topic = String(req.body?.topic || "").trim();
   if (!topic) return res.status(400).json({ error: "tema não informado" });
   try {
-    const r = await explainTopic({ topic });
+    const r = await explainTopic({ topic, nicho: await getNiche() });
     res.json(r);
   } catch (err) {
     console.error("[explain-topic] erro:", err.message);
@@ -70,6 +72,7 @@ draftsRouter.patch("/:id", async (req, res) => {
   // Reverifica com o texto editado (não bloqueia se a IA falhar).
   try {
     const oab = await evaluateOab({
+      nicho: await getNiche(),
       hook: draft.hook,
       script: draft.script,
       caption: draft.caption,
@@ -105,6 +108,7 @@ draftsRouter.post("/:id/regenerate", async (req, res) => {
   try {
     const novo = await regeneratePart({
       part,
+      nicho: await getNiche(),
       duration,
       title: draft.article?.title,
       summary: draft.article?.summary,
@@ -130,6 +134,7 @@ draftsRouter.post("/:id/check-oab", async (req, res) => {
 
   try {
     const resultado = await checkOAB({
+      nicho: await getNiche(),
       hook: draft.hook,
       script: draft.script,
       caption: draft.caption,
@@ -160,8 +165,10 @@ draftsRouter.post("/:id/fix-oab", async (req, res) => {
     alertas = [];
   }
 
+  const nicho = await getNiche();
   try {
     const novo = await generateCorrected({
+      nicho,
       title: draft.article?.title,
       summary: draft.article?.summary,
       link: draft.article?.link,
@@ -175,7 +182,7 @@ draftsRouter.post("/:id/fix-oab", async (req, res) => {
     // Reverifica a versão corrigida (não bloqueia se a IA falhar).
     let oab = { oabConforme: null, oabAlertas: null };
     try {
-      oab = await evaluateOab(novo);
+      oab = await evaluateOab({ ...novo, nicho });
     } catch (e) {
       console.error("[oab] reverificação após corrigir falhou:", e.message);
     }

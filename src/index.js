@@ -10,6 +10,7 @@ import { articlesRouter } from "./routes/articles.js";
 import { draftsRouter } from "./routes/drafts.js";
 import { calendarRouter } from "./routes/calendar.js";
 import { settingsRouter } from "./routes/settings.js";
+import { nicheRouter } from "./routes/niche.js";
 
 const app = express();
 app.use(cors());
@@ -28,13 +29,14 @@ app.use((req, res, next) => {
   res.status(401).json({ error: "senha necessária" });
 });
 
-app.get("/", (_req, res) => res.json({ ok: true, service: "pauta-juridica" }));
+app.get("/", (_req, res) => res.json({ ok: true, service: "coruja" }));
 
 app.use("/sources", sourcesRouter);
 app.use("/articles", articlesRouter);
 app.use("/drafts", draftsRouter);
 app.use("/calendar", calendarRouter);
 app.use("/settings", settingsRouter);
+app.use("/niche", nicheRouter);
 
 // Rotina diária às 7h (horário de Brasília): coleta de notícias + lembrete dos
 // posts do dia. Sem o timezone explícito, o "7h" seria no relógio do servidor
@@ -89,7 +91,7 @@ app.post("/reminders/test", async (req, res) => {
 });
 
 app.listen(config.port, () => {
-  console.log(`pauta-juridica rodando na porta ${config.port}`);
+  console.log(`coruja rodando na porta ${config.port}`);
   if (!config.appPassword) {
     console.warn(
       "[auth] APP_PASSWORD não definida — o app está SEM senha (aberto). Defina a variável no Railway para proteger."

@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { triageArticle } from "./ai.js";
+import { getNiche } from "./niche.js";
 
 const parser = new Parser({ timeout: 10000 });
 
@@ -87,12 +88,14 @@ export async function runIngestion() {
 // Faz a triagem de relevância das notícias ainda "novas", várias ao mesmo tempo.
 async function triageNovas() {
   const pendentes = await prisma.article.findMany({ where: { status: "novo" } });
+  const nicho = await getNiche();
 
   await mapLimit(pendentes, 4, async (art) => {
     try {
       const { score, reason } = await triageArticle({
         title: art.title,
         summary: art.summary,
+        nicho,
       });
       await prisma.article.update({
         where: { id: art.id },

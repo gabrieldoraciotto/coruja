@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { runIngestion } from "../services/ingest.js";
 import { generateScript, evaluateOab } from "../services/ai.js";
+import { getNiche } from "../services/niche.js";
 
 export const articlesRouter = Router();
 
@@ -28,6 +29,7 @@ articlesRouter.post("/:id/generate", async (req, res) => {
   if (!article) return res.status(404).json({ error: "notícia não encontrada" });
 
   const format = req.body?.format === "carrossel" ? "carrossel" : "reel";
+  const nicho = await getNiche();
 
   try {
     const { hook, script, caption } = await generateScript({
@@ -35,6 +37,7 @@ articlesRouter.post("/:id/generate", async (req, res) => {
       summary: article.summary,
       link: article.link,
       format,
+      nicho,
     });
     const draft = await prisma.draft.create({
       data: { articleId: article.id, format, hook, script, caption },
@@ -45,7 +48,7 @@ articlesRouter.post("/:id/generate", async (req, res) => {
     // Verificação automática da OAB. Não bloqueia: se a IA falhar, o roteiro é
     // criado mesmo assim, apenas sem o selo (oabConforme fica null).
     try {
-      const oab = await evaluateOab({ hook, script, caption });
+      const oab = await evaluateOab({ hook, script, caption, nicho });
       const comOab = await prisma.draft.update({ where: { id: draft.id }, data: oab });
       return res.status(201).json(comOab);
     } catch (e) {
