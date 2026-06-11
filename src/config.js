@@ -55,21 +55,7 @@ export const config = {
 // testamos (STJ, CJF, Câmara, Senado, INSS/Previdência no gov.br) ficaram de
 // fora de propósito — davam timeout/403/404/503. O ensureSources() garante que
 // estas existam com o nome certo a cada boot (e conserta acento bugado).
-export const seedSources = [
-  {
-    name: "Google Notícias — Tecnologia e IA",
-    feedUrl:
-      "https://news.google.com/rss/search?q=%22intelig%C3%AAncia%20artificial%22%20OR%20tecnologia%20OR%20startups&hl=pt-BR&gl=BR&ceid=BR:pt-419",
-    type: "agregador",
-  },
-  {
-    name: "TecMundo",
-    feedUrl: "https://rss.tecmundo.com.br/feed",
-    type: "imprensa",
-  },
-  {
-    name: "Canaltech",
-    feedUrl: "https://canaltech.com.br/rss/",
-    type: "imprensa",
-  },
-];
+// Sem fontes fixas: a fonte dinâmica "Google Notícias — tema do canal"
+// (ver src/services/niche.js) acompanha o tema configurado, e feeds
+// específicos podem ser adicionados pela aba Fontes.
+export const seedSources = [];

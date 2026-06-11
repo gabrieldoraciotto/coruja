@@ -1,14 +1,13 @@
 import { prisma } from "../db.js";
 import { seedSources } from "../config.js";
+import { getNiche, syncNicheSource } from "./niche.js";
 
-// Garante, a cada boot do app, que as fontes padrão existem com o nome correto.
-// É o que mantém o feed do Google Notícias como fonte fixa (mesmo num ambiente
-// novo) e corrige nomes gravados com acento bugado (ex.: "Consultor Jur�dico"
-// volta a ser "Consultor Jurídico"). A correspondência é pelo feedUrl.
+// Garante, a cada boot, que as fontes padrão existem e que a fonte dinâmica
+// do tema aponta para o tema atual do canal.
 //
-// É de propósito GENTIL: só cria as fontes que faltam e ajusta o nome/tipo das
-// que existem. NÃO desativa nem apaga nada — as fontes que a Sara liga/desliga
-// pela aba Fontes continuam sob controle dela.
+// É de propósito GENTIL: só cria o que falta e ajusta nome/tipo do que existe.
+// NÃO desativa nem apaga nada — fontes adicionadas pela aba Fontes continuam
+// sob controle de quem as criou (até o reset noturno da demo).
 export async function ensureSources() {
   for (const s of seedSources) {
     try {
@@ -21,5 +20,6 @@ export async function ensureSources() {
       console.error(`[sources] falha ao garantir ${s.name}: ${err.message}`);
     }
   }
-  console.log(`[sources] fontes padrão garantidas (${seedSources.length}).`);
+  await syncNicheSource(await getNiche());
+  console.log("[sources] fontes padrão garantidas.");
 }
