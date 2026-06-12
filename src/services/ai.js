@@ -517,3 +517,4 @@ Regras:
   );
   return { explanation: extractText(resp).trim() };
 }
+
