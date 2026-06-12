@@ -97,15 +97,18 @@ Resumo: ${summary || "(sem resumo)"}`;
 // nota (ou se o JSON vier malformado) simplesmente ficam para a próxima
 // rodada — o chamador trata o vazio.
 export async function triageArticlesBatch({ items, nicho }) {
+  // Manchetes vêm cheias de aspas ('Não é só treino e dieta', diz fulano) e o
+  // modelo pequeno as ecoa sem escapar, quebrando o JSON. Higieniza antes.
+  const limpo = (t) => String(t || "").replace(/["'\u201C\u201D\u2018\u2019]/g, "");
   const lista = items
-    .map((it, i) => `${i + 1}. Título: ${it.title}\n   Resumo: ${it.summary || "(sem resumo)"}`)
+    .map((it, i) => `${i + 1}. Título: ${limpo(it.title)}\n   Resumo: ${limpo(it.summary) || "(sem resumo)"}`)
     .join("\n");
 
   const prompt = `Você faz a triagem de notícias para um canal que produz conteúdo educativo no Instagram sobre: ${nicho}.
 
 Avalie CADA notícia da lista e responda APENAS com um JSON, sem texto antes ou depois, no formato:
 {"resultados":[{"n":1,"score":<0-100>,"reason":"<uma frase curta>"},{"n":2,"score":...}]}
-Inclua exatamente um item por notícia, com "n" igual ao número dela na lista.
+Inclua exatamente um item por notícia, com "n" igual ao número dela na lista. Não use aspas dentro de "reason".
 
 Critérios de pontuação alta (score alto):
 - Relação direta com o tema do canal (${nicho}) e efeito prático para o público.
@@ -128,20 +131,42 @@ ${lista}`;
   );
 
   const notas = new Map();
+  const text = extractText(resp);
+  let resultados = [];
   try {
-    const parsed = parseAiJson(extractText(resp));
-    for (const r of parsed.resultados || []) {
-      const item = items[parseInt(r.n, 10) - 1];
-      if (!item) continue;
-      notas.set(item.id, {
-        score: Math.max(0, Math.min(100, parseInt(r.score, 10) || 0)),
-        reason: r.reason || "",
-      });
-    }
+    resultados = parseAiJson(text).resultados || [];
   } catch {
-    // JSON irrecuperável: devolve vazio e o grupo inteiro fica para a próxima.
+    // O modelo 8b frequentemente entrega as notas certas com sintaxe quebrada
+    // (aspas de abertura faltando, escapes embaralhados). Em vez de jogar o
+    // conteúdo fora, o resgate pesca os trios pela ESTRUTURA — os nomes dos
+    // campos, que o modelo sempre acerta — ignorando a sintaxe ao redor.
+    resultados = resgatarNotas(text);
+    if (resultados.length) {
+      console.log(`[triagem] JSON malformado — resgate estrutural recuperou ${resultados.length} nota(s).`);
+    }
+  }
+  for (const r of resultados) {
+    const item = items[parseInt(r.n, 10) - 1];
+    if (!item) continue;
+    notas.set(item.id, {
+      score: Math.max(0, Math.min(100, parseInt(r.score, 10) || 0)),
+      reason: String(r.reason || "").trim(),
+    });
   }
   return notas;
+}
+
+// Pesca {n, score, reason} de um texto com JSON quebrado. Âncora nos nomes
+// dos campos (na ordem pedida no prompt) e lê o reason até a próxima aspa,
+// chave ou quebra de linha — tolera aspas de abertura ausentes.
+function resgatarNotas(text) {
+  const out = [];
+  const re = /"n"\s*:\s*(\d+)\s*,\s*"score"\s*:\s*(\d+)\s*,\s*"reason"\s*:\s*"?([^"}\n]*)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    out.push({ n: parseInt(m[1], 10), score: parseInt(m[2], 10), reason: m[3] });
+  }
+  return out;
 }
 
 // ── 2. Geração de roteiro ─────────────────────────────────────────────────
@@ -492,4 +517,3 @@ Regras:
   );
   return { explanation: extractText(resp).trim() };
 }
-
