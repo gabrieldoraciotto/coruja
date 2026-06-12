@@ -66,9 +66,18 @@ export async function setNiche(value) {
   if (anterior !== v) {
     try {
       const r = await prisma.article.deleteMany({ where: { drafts: { none: {} } } });
-      console.log(`[niche] tema trocado ("${anterior}" → "${v}") — ${r.count} notícia(s) do tema anterior removida(s).`);
+      // As fontes do tema anterior também saem de cena (ficam desativadas,
+      // visíveis na aba Fontes) — senão continuariam reenchendo a fila de
+      // triagem com assunto velho a cada coleta. Só a fonte dinâmica fica.
+      const f = await prisma.source.updateMany({
+        where: { name: { not: NICHE_SOURCE_NAME }, active: true },
+        data: { active: false },
+      });
+      console.log(
+        `[niche] tema trocado ("${anterior}" → "${v}") — ${r.count} notícia(s) removida(s), ${f.count} fonte(s) do tema anterior desativada(s).`
+      );
     } catch (err) {
-      console.error(`[niche] falha ao limpar notícias do tema anterior: ${err.message}`);
+      console.error(`[niche] falha ao limpar o tema anterior: ${err.message}`);
     }
   }
   return v;

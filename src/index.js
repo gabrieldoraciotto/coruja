@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import cron from "node-cron";
 import { config } from "./config.js";
-import { runIngestion } from "./services/ingest.js";
+import { runIngestion, iniciarTriagem } from "./services/ingest.js";
 import { sendDailyReminders } from "./services/reminders.js";
 import { ensureSources } from "./services/sources-sync.js";
 import { sourcesRouter } from "./routes/sources.js";
@@ -97,7 +97,10 @@ app.listen(config.port, () => {
       "[auth] APP_PASSWORD não definida — o app está SEM senha (aberto). Defina a variável no Railway para proteger."
     );
   }
-  // Garante as fontes padrão (Google Notícias, JOTA, Conjur) e corrige nomes.
-  // Roda em segundo plano: se falhar, o app continua de pé normalmente.
+  // Garante as fontes padrão e a fonte dinâmica do tema. Roda em segundo
+  // plano: se falhar, o app continua de pé normalmente.
   ensureSources().catch((e) => console.error("[sources] sync falhou:", e.message));
+  // Retoma a triagem de notícias que ficaram na fila (ex.: o deploy reiniciou
+  // o servidor no meio do trabalho). Se a fila estiver vazia, encerra na hora.
+  iniciarTriagem();
 });

@@ -82,7 +82,10 @@ const LOTE_TRIAGEM = 40;
 // Coletar ou o cron das 7h não criam triagens concorrentes brigando por cota).
 let triagemEmAndamento = false;
 
-function iniciarTriagem() {
+// Exportada: o boot do app chama para RETOMAR a fila pendente — sem isso,
+// cada deploy/reinício do Railway matava o trabalhador no meio do serviço
+// e a fila ficava órfã até alguém clicar em Coletar de novo.
+export function iniciarTriagem() {
   if (triagemEmAndamento) {
     console.log("[triagem] já há uma triagem em andamento — novas notícias entram na mesma fila.");
     return;
