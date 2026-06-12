@@ -17,7 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── Porteiro: senha única do escritório ──────────────────────────────────
+// ── Porteiro: senha única da aplicação ───────────────────────────────────
 // Toda requisição precisa trazer a senha no cabeçalho "x-app-key".
 // Liberados: o preflight do navegador (OPTIONS, que não carrega cabeçalhos
 // customizados) e o GET / (health check do Railway).

@@ -64,7 +64,7 @@ function montarEmail(periodo, agendados) {
   return (
     `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;` +
     `background:#F5F0E8;padding:28px;border-radius:16px;color:#2A241E;">` +
-    `<p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#B07D3A;margin:0 0 4px;">Pauta Jurídica</p>` +
+    `<p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#B07D3A;margin:0 0 4px;">Coruja</p>` +
     `<h1 style="font-size:22px;color:#1B4332;margin:0 0 16px;">${periodo.titulo}</h1>` +
     `<p style="margin:0 0 16px;">${periodo.intro(agendados.length)}</p>` +
     `<ul style="padding-left:18px;margin:0 0 22px;">${itens}</ul>` +

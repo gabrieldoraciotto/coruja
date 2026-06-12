@@ -1,7 +1,7 @@
 {
-  "name": "pauta-juridica",
+  "name": "coruja",
   "version": "0.1.0",
-  "description": "Esteira de produção de conteúdo previdenciário: lê notícias, gera pauta/roteiro e organiza um calendário editorial com cadência estável.",
+  "description": "Redação automática de conteúdo para Instagram — backend",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

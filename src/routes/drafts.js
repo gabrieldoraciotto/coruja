@@ -99,7 +99,7 @@ draftsRouter.patch("/:id", async (req, res) => {
 // Gera uma NOVA versão de UMA parte do roteiro (hook | script | caption).
 // Recebe o conteúdo atual no corpo (para manter coerência) e NÃO salva — devolve
 // só o novo texto da parte pedida, para a tela colocar no formulário de edição.
-// A verificação da OAB roda quando a Sara SALVA a edição (rota PATCH), não aqui.
+// A verificação da OAB roda quando o usuário SALVA a edição (rota PATCH), não aqui.
 draftsRouter.post("/:id/regenerate", async (req, res) => {
   try {
     await consumirGeracao();
@@ -263,7 +263,7 @@ draftsRouter.post("/:id/schedule", async (req, res) => {
   res.json(draft);
 });
 
-// Devolve o roteiro para a fila (tira do dia). Usado quando a Sara troca de ideia
+// Devolve o roteiro para a fila (tira do dia). Usado quando o usuário troca de ideia
 // sobre qual roteiro vai naquele dia.
 draftsRouter.post("/:id/unschedule", async (req, res) => {
   const draft = await prisma.draft.update({

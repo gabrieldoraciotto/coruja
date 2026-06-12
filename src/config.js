@@ -6,7 +6,7 @@ const cadenceFromEnv = process.env.CADENCE_DAYS
 
 export const config = {
   port: process.env.PORT || 3333,
-  // Senha única do escritório (defina APP_PASSWORD no Railway). Sem ela, o app
+  // Senha única da aplicação (defina APP_PASSWORD no Railway). Sem ela, o app
   // fica ABERTO — o index.js avisa no boot.
   appPassword: process.env.APP_PASSWORD,
   cadenceDays: cadenceFromEnv || [1, 3, 5],

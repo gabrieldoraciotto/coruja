@@ -46,7 +46,7 @@ sourcesRouter.delete("/:id", async (req, res) => {
     const artigoIds = artigos.map((a) => a.id);
 
     if (artigoIds.length) {
-      // Solta os roteiros (mantém o trabalho da Sara) e remove as notícias.
+      // Solta os roteiros (mantém o trabalho do usuário) e remove as notícias.
       await prisma.draft.updateMany({
         where: { articleId: { in: artigoIds } },
         data: { articleId: null },

@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 
 // Dias padrão de publicação (0=domingo ... 6=sábado). Default: seg, qua, sex.
-// Pode vir do .env como "1,3,5"; vira o ponto de partida até a Sara escolher na tela.
+// Pode vir do .env como "1,3,5"; vira o ponto de partida até o usuário escolher na tela.
 const DEFAULT_CADENCE = (
   process.env.CADENCE_DAYS
     ? process.env.CADENCE_DAYS.split(",").map((d) => parseInt(d.trim(), 10))
