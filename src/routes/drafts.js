@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import { getCadenceDays } from "../services/settings.js";
 import { checkOAB, evaluateOab, generateCorrected, generateFromTopic, explainTopic, regeneratePart } from "../services/ai.js";
 import { getNiche } from "../services/niche.js";
+import { consumirGeracao } from "../services/quota.js";
 
 export const draftsRouter = Router();
 
@@ -20,6 +21,11 @@ draftsRouter.get("/", async (req, res) => {
 // Cria um roteiro a partir de um TEMA livre (pauta própria), sem notícia de
 // origem. Verifica a OAB automaticamente, igual aos roteiros de notícia.
 draftsRouter.post("/from-topic", async (req, res) => {
+  try {
+    await consumirGeracao();
+  } catch (e) {
+    return res.status(429).json({ error: e.message });
+  }
   const topic = String(req.body?.topic || "").trim();
   if (!topic) return res.status(400).json({ error: "informe o tema do roteiro" });
   const format = req.body?.format === "carrossel" ? "carrossel" : "reel";
@@ -47,6 +53,11 @@ draftsRouter.post("/from-topic", async (req, res) => {
 
 // Explica um tema/data (sem criar roteiro). Devolve { explanation }.
 draftsRouter.post("/explain-topic", async (req, res) => {
+  try {
+    await consumirGeracao();
+  } catch (e) {
+    return res.status(429).json({ error: e.message });
+  }
   const topic = String(req.body?.topic || "").trim();
   if (!topic) return res.status(400).json({ error: "tema não informado" });
   try {
@@ -90,6 +101,11 @@ draftsRouter.patch("/:id", async (req, res) => {
 // só o novo texto da parte pedida, para a tela colocar no formulário de edição.
 // A verificação da OAB roda quando a Sara SALVA a edição (rota PATCH), não aqui.
 draftsRouter.post("/:id/regenerate", async (req, res) => {
+  try {
+    await consumirGeracao();
+  } catch (e) {
+    return res.status(429).json({ error: e.message });
+  }
   const partesValidas = ["hook", "script", "caption"];
   const part = partesValidas.includes(req.body?.part) ? req.body.part : "script";
   const dursValidas = ["curto", "medio", "longo"];
@@ -149,6 +165,11 @@ draftsRouter.post("/:id/check-oab", async (req, res) => {
 // Gera uma versão CORRIGIDA do roteiro, ajustando os pontos apontados na última
 // verificação da OAB (oabAlertas), reverifica e sobrescreve o mesmo roteiro.
 draftsRouter.post("/:id/fix-oab", async (req, res) => {
+  try {
+    await consumirGeracao();
+  } catch (e) {
+    return res.status(429).json({ error: e.message });
+  }
   const draft = await prisma.draft.findUnique({
     where: { id: req.params.id },
     include: { article: true },

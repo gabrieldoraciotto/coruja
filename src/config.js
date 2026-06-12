@@ -14,6 +14,8 @@ export const config = {
   relevanceThreshold: parseInt(process.env.RELEVANCE_THRESHOLD || "60", 10),
   // Tema padrão do canal (o visitante pode trocar na tela de ajustes).
   defaultNiche: process.env.DEFAULT_NICHE || "tecnologia e inteligência artificial",
+  // Teto diário de gerações de roteiro do playground (protege a cota da IA).
+  dailyGenerationLimit: parseInt(process.env.DAILY_GENERATION_LIMIT || "40", 10),
 
   // ── Provedor de IA ────────────────────────────────────────────────────
   // Compatível com qualquer API no formato OpenAI. Troque AI_BASE_URL e os

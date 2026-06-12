@@ -3,6 +3,7 @@ import cors from "cors";
 import cron from "node-cron";
 import { config } from "./config.js";
 import { runIngestion, iniciarTriagem } from "./services/ingest.js";
+import { resetDemo } from "./services/reset.js";
 import { sendDailyReminders } from "./services/reminders.js";
 import { ensureSources } from "./services/sources-sync.js";
 import { sourcesRouter } from "./routes/sources.js";
@@ -89,6 +90,21 @@ app.post("/reminders/test", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Reset noturno do playground (promessa do banner): toda madrugada a demo
+// volta ao padrão de fábrica.
+cron.schedule(
+  "0 4 * * *",
+  async () => {
+    console.log("[cron] reset noturno da demo...");
+    try {
+      await resetDemo();
+    } catch (e) {
+      console.error("[reset] falhou:", e.message);
+    }
+  },
+  { timezone: "America/Sao_Paulo" }
+);
 
 app.listen(config.port, () => {
   console.log(`coruja rodando na porta ${config.port}`);

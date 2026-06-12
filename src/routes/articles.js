@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import { runIngestion } from "../services/ingest.js";
 import { generateScript, evaluateOab } from "../services/ai.js";
 import { getNiche } from "../services/niche.js";
+import { consumirGeracao } from "../services/quota.js";
 
 export const articlesRouter = Router();
 
@@ -30,6 +31,11 @@ articlesRouter.post("/:id/generate", async (req, res) => {
 
   const format = req.body?.format === "carrossel" ? "carrossel" : "reel";
   const nicho = await getNiche();
+  try {
+    await consumirGeracao();
+  } catch (e) {
+    return res.status(429).json({ error: e.message });
+  }
 
   try {
     const { hook, script, caption } = await generateScript({
