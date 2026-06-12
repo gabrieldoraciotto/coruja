@@ -12,13 +12,6 @@ COPY . .
 # Gerar cliente Prisma
 RUN npm run db:generate
 
-# Build frontend
-WORKDIR /app/frontend
-RUN npm install && npm run build
-
-# Voltar ao diretório raiz
-WORKDIR /app
-
 EXPOSE 3000
 
 CMD ["node", "scripts/wait-and-migrate.js"]
