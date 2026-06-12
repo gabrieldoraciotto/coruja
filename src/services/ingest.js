@@ -81,32 +81,68 @@ export async function runIngestion() {
     await prisma.article.createMany({ data: novos, skipDuplicates: true });
   }
 
-  await triageNovas();
+  // Triagem em segundo plano: a resposta volta na hora e a página acompanha
+  // o progresso. O trabalhador drena a fila em lotes, um de cada vez.
+  iniciarTriagem();
   return { novas: novos.length };
 }
 
 // Faz a triagem de relevância das notícias ainda "novas", várias ao mesmo tempo.
-async function triageNovas() {
-  const pendentes = await prisma.article.findMany({ where: { status: "novo" } });
-  const nicho = await getNiche();
+// Tamanho do lote do trabalhador: o free tier da IA tem limite de tokens POR
+// MINUTO, então a fila é drenada aos poucos (2 em paralelo, lotes de 40).
+const LOTE_TRIAGEM = 40;
 
-  await mapLimit(pendentes, 4, async (art) => {
+// Trava simples: garante UM trabalhador de triagem por vez (clique repetido em
+// Coletar ou o cron das 7h não criam triagens concorrentes brigando por cota).
+let triagemEmAndamento = false;
+
+function iniciarTriagem() {
+  if (triagemEmAndamento) {
+    console.log("[triagem] já há uma triagem em andamento — novas notícias entram na mesma fila.");
+    return;
+  }
+  triagemEmAndamento = true;
+  (async () => {
     try {
-      const { score, reason } = await triageArticle({
-        title: art.title,
-        summary: art.summary,
-        nicho,
-      });
-      await prisma.article.update({
-        where: { id: art.id },
-        data: {
-          relevanceScore: score,
-          relevanceReason: reason,
-          status: score >= config.relevanceThreshold ? "relevante" : "descartado",
-        },
-      });
+      // Quem falhar (429 persistente etc.) continua "novo", mas não é retentado
+      // nesta rodada — fica para a próxima coleta. Evita rodar para sempre.
+      const tentados = new Set();
+      while (true) {
+        const fila = await prisma.article.findMany({
+          where: { status: "novo" },
+          orderBy: { fetchedAt: "desc" },
+        });
+        const lote = fila.filter((a) => !tentados.has(a.id)).slice(0, LOTE_TRIAGEM);
+        if (lote.length === 0) break;
+        lote.forEach((a) => tentados.add(a.id));
+        console.log(`[triagem] processando lote de ${lote.length} (fila: ${fila.length}).`);
+
+        const nicho = await getNiche();
+        await mapLimit(lote, 2, async (art) => {
+          try {
+            const { score, reason } = await triageArticle({
+              title: art.title,
+              summary: art.summary,
+              nicho,
+            });
+            await prisma.article.update({
+              where: { id: art.id },
+              data: {
+                relevanceScore: score,
+                relevanceReason: reason,
+                status: score >= config.relevanceThreshold ? "relevante" : "descartado",
+              },
+            });
+          } catch (err) {
+            console.error(`[triagem] falha no artigo ${art.id}: ${err.message}`);
+          }
+        });
+      }
     } catch (err) {
-      console.error(`[triagem] falha no artigo ${art.id}: ${err.message}`);
+      console.error("[triagem] trabalhador interrompido:", err.message);
+    } finally {
+      triagemEmAndamento = false;
+      console.log("[triagem] fila drenada.");
     }
-  });
+  })();
 }
