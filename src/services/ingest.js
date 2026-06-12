@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import { prisma } from "../db.js";
 import { config } from "../config.js";
-import { triageArticle } from "./ai.js";
+import { triageArticlesBatch } from "./ai.js";
 import { getNiche } from "./niche.js";
 
 const parser = new Parser({ timeout: 10000 });
@@ -107,28 +107,42 @@ export function iniciarTriagem() {
         console.log(`[triagem] processando lote de ${lote.length} (fila: ${fila.length}).`);
 
         const nicho = await getNiche();
-        for (const art of lote) {
+        // Grupos de 8 notícias por chamada de IA: ~1400 tokens por chamada,
+        // uma a cada 15s ≈ 4 chamadas/min ≈ 5600 tokens/min — dentro do teto
+        // de 6000/min do free tier, triando ~32 notícias por minuto (~3x mais
+        // que uma chamada por notícia).
+        const POR_CHAMADA = 8;
+        for (let i = 0; i < lote.length; i += POR_CHAMADA) {
+          const grupo = lote.slice(i, i + POR_CHAMADA);
           try {
-            const { score, reason } = await triageArticle({
-              title: art.title,
-              // 280 caracteres bastam para dar nota — e economizam tokens.
-              summary: (art.summary || "").slice(0, 280),
+            const notas = await triageArticlesBatch({
+              items: grupo.map((a) => ({
+                id: a.id,
+                title: a.title,
+                // 280 caracteres bastam para dar nota — e economizam tokens.
+                summary: (a.summary || "").slice(0, 280),
+              })),
               nicho,
             });
-            await prisma.article.update({
-              where: { id: art.id },
-              data: {
-                relevanceScore: score,
-                relevanceReason: reason,
-                status: score >= config.relevanceThreshold ? "relevante" : "descartado",
-              },
-            });
+            for (const art of grupo) {
+              const nota = notas.get(art.id);
+              if (!nota) {
+                console.error(`[triagem] sem nota para ${art.id} — fica para a próxima rodada.`);
+                continue;
+              }
+              await prisma.article.update({
+                where: { id: art.id },
+                data: {
+                  relevanceScore: nota.score,
+                  relevanceReason: nota.reason,
+                  status: nota.score >= config.relevanceThreshold ? "relevante" : "descartado",
+                },
+              });
+            }
           } catch (err) {
-            console.error(`[triagem] falha no artigo ${art.id}: ${err.message}`);
+            console.error(`[triagem] falha no grupo de ${grupo.length}: ${err.message}`);
           }
-          // Ritmo: ~13 triagens/min. O free tier dá 6000 tokens/MINUTO e cada
-          // triagem usa ~400 — acima desse ritmo, chove 429. A conta manda.
-          await new Promise((r) => setTimeout(r, 4500));
+          await new Promise((r) => setTimeout(r, 15000));
         }
       }
     } catch (err) {

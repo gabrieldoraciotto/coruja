@@ -9,14 +9,14 @@ const client = new OpenAI({
 });
 
 // Pequeno retry para o caso de estourar o limite por minuto (erro 429) dos free tiers.
-async function withRetry(fn, tentativas = 3) {
+async function withRetry(fn, tentativas = 4) {
   for (let i = 0; i < tentativas; i++) {
     try {
       return await fn();
     } catch (err) {
       const status = err?.status || err?.response?.status;
       if (status === 429 && i < tentativas - 1) {
-        const espera = 2000 * (i + 1); // 2s, 4s, ...
+        const espera = 3000 * (i + 1); // 3s, 6s, 9s — o limite do free tier é por MINUTO
         await new Promise((r) => setTimeout(r, espera));
         continue;
       }
@@ -89,6 +89,59 @@ Resumo: ${summary || "(sem resumo)"}`;
   } catch {
     return { score: 0, reason: "Falha ao interpretar a triagem — revisar manualmente." };
   }
+}
+
+// Triagem em LOTE: avalia várias notícias numa única chamada. O custo fixo do
+// prompt é compartilhado, então o limite de tokens/minuto do free tier rende
+// ~3x mais notícias do que uma chamada por notícia. Itens que voltarem sem
+// nota (ou se o JSON vier malformado) simplesmente ficam para a próxima
+// rodada — o chamador trata o vazio.
+export async function triageArticlesBatch({ items, nicho }) {
+  const lista = items
+    .map((it, i) => `${i + 1}. Título: ${it.title}\n   Resumo: ${it.summary || "(sem resumo)"}`)
+    .join("\n");
+
+  const prompt = `Você faz a triagem de notícias para um canal que produz conteúdo educativo no Instagram sobre: ${nicho}.
+
+Avalie CADA notícia da lista e responda APENAS com um JSON, sem texto antes ou depois, no formato:
+{"resultados":[{"n":1,"score":<0-100>,"reason":"<uma frase curta>"},{"n":2,"score":...}]}
+Inclua exatamente um item por notícia, com "n" igual ao número dela na lista.
+
+Critérios de pontuação alta (score alto):
+- Relação direta com o tema do canal (${nicho}) e efeito prático para o público.
+- Novidades, mudanças, lançamentos ou decisões que esse público precise saber.
+- Assunto que rende um bom vídeo curto ou carrossel educativo.
+
+Critérios de pontuação baixa (score baixo):
+- Assuntos sem relação com o tema do canal.
+- Notícia institucional ou burocrática, sem efeito prático para o público.
+
+NOTÍCIAS:
+${lista}`;
+
+  const resp = await withRetry(() =>
+    client.chat.completions.create({
+      model: config.ai.triageModel,
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }],
+    })
+  );
+
+  const notas = new Map();
+  try {
+    const parsed = parseAiJson(extractText(resp));
+    for (const r of parsed.resultados || []) {
+      const item = items[parseInt(r.n, 10) - 1];
+      if (!item) continue;
+      notas.set(item.id, {
+        score: Math.max(0, Math.min(100, parseInt(r.score, 10) || 0)),
+        reason: r.reason || "",
+      });
+    }
+  } catch {
+    // JSON irrecuperável: devolve vazio e o grupo inteiro fica para a próxima.
+  }
+  return notas;
 }
 
 // ── 2. Geração de roteiro ─────────────────────────────────────────────────
