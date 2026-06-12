@@ -6,20 +6,6 @@ import { getNiche } from "./niche.js";
 
 const parser = new Parser({ timeout: 10000 });
 
-// Roda várias promessas com concorrência limitada (não enfileira tudo, mas
-// também não dispara 50 de uma vez e estoura o limite da IA).
-async function mapLimit(items, limit, fn) {
-  let i = 0;
-  async function worker() {
-    while (i < items.length) {
-      const idx = i++;
-      await fn(items[idx]);
-    }
-  }
-  const n = Math.min(limit, items.length);
-  await Promise.all(Array.from({ length: n }, worker));
-}
-
 // Lê todos os feeds ativos, salva notícias novas (sem duplicar) e faz a triagem.
 export async function runIngestion() {
   const sources = await prisma.source.findMany({ where: { active: true } });
@@ -118,11 +104,12 @@ function iniciarTriagem() {
         console.log(`[triagem] processando lote de ${lote.length} (fila: ${fila.length}).`);
 
         const nicho = await getNiche();
-        await mapLimit(lote, 2, async (art) => {
+        for (const art of lote) {
           try {
             const { score, reason } = await triageArticle({
               title: art.title,
-              summary: art.summary,
+              // 280 caracteres bastam para dar nota — e economizam tokens.
+              summary: (art.summary || "").slice(0, 280),
               nicho,
             });
             await prisma.article.update({
@@ -136,7 +123,10 @@ function iniciarTriagem() {
           } catch (err) {
             console.error(`[triagem] falha no artigo ${art.id}: ${err.message}`);
           }
-        });
+          // Ritmo: ~13 triagens/min. O free tier dá 6000 tokens/MINUTO e cada
+          // triagem usa ~400 — acima desse ritmo, chove 429. A conta manda.
+          await new Promise((r) => setTimeout(r, 4500));
+        }
       }
     } catch (err) {
       console.error("[triagem] trabalhador interrompido:", err.message);
