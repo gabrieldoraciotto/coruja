@@ -52,6 +52,7 @@ export async function getNiche() {
 export async function setNiche(value) {
   const v = String(value || "").trim().slice(0, 200);
   if (!v) return getNiche();
+  const anterior = await getNiche();
   await prisma.setting.upsert({
     where: { key: "niche" },
     update: { value: v },
@@ -59,5 +60,16 @@ export async function setNiche(value) {
   });
   // A fonte de notícias acompanha o tema na hora.
   await syncNicheSource(v);
+  // Trocar de tema = redação nova: as notícias do tema anterior saem da mesa
+  // (inclusive as que ainda estavam na fila de triagem). Ficam apenas as que
+  // já viraram roteiro — apagá-las quebraria os roteiros criados delas.
+  if (anterior !== v) {
+    try {
+      const r = await prisma.article.deleteMany({ where: { drafts: { none: {} } } });
+      console.log(`[niche] tema trocado ("${anterior}" → "${v}") — ${r.count} notícia(s) do tema anterior removida(s).`);
+    } catch (err) {
+      console.error(`[niche] falha ao limpar notícias do tema anterior: ${err.message}`);
+    }
+  }
   return v;
 }
