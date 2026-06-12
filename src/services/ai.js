@@ -51,6 +51,16 @@ function parseAiJson(text) {
   return JSON.parse(out);
 }
 
+// A IA às vezes devolve um campo de texto como LISTA de parágrafos (ou até
+// objeto aninhado), mesmo quando o prompt pede string — e o banco só aceita
+// texto. Achata qualquer formato para texto plano antes de confiar.
+function textoPlano(v) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(textoPlano).filter(Boolean).join("\n\n");
+  if (typeof v === "object") return Object.values(v).map(textoPlano).filter(Boolean).join("\n\n");
+  return String(v);
+}
+
 // ── 1. Triagem de relevância ──────────────────────────────────────────────
 export async function triageArticle({ title, summary, nicho }) {
   const prompt = `Você faz a triagem de notícias para um canal que produz conteúdo educativo no Instagram sobre: ${nicho}.
@@ -244,9 +254,9 @@ ${buildOrigem({ topic })}`;
   const text = extractText(resp);
   const parsed = parseAiJson(text);
   return {
-    hook: parsed.hook || "",
-    script: parsed.script || "",
-    caption: parsed.caption || "",
+    hook: textoPlano(parsed.hook),
+    script: textoPlano(parsed.script),
+    caption: textoPlano(parsed.caption),
   };
 }
 
@@ -295,9 +305,9 @@ Fonte: ${link}`;
   const text = extractText(resp);
   const parsed = parseAiJson(text);
   return {
-    hook: parsed.hook || "",
-    script: parsed.script || "",
-    caption: parsed.caption || "",
+    hook: textoPlano(parsed.hook),
+    script: textoPlano(parsed.script),
+    caption: textoPlano(parsed.caption),
   };
 }
 
@@ -414,9 +424,9 @@ Legenda: ${caption}`;
   const text = extractText(resp);
   const parsed = parseAiJson(text);
   return {
-    hook: parsed.hook || hook,
-    script: parsed.script || script,
-    caption: parsed.caption || caption,
+    hook: textoPlano(parsed.hook) || hook,
+    script: textoPlano(parsed.script) || script,
+    caption: textoPlano(parsed.caption) || caption,
   };
 }
 
@@ -486,11 +496,11 @@ Legenda: ${caption}`;
 
   const text = extractText(resp);
   const parsed = parseAiJson(text);
-  const valor = parsed[campo];
-  if (!valor || !String(valor).trim()) {
+  const valor = textoPlano(parsed[campo]);
+  if (!valor.trim()) {
     throw new Error("resposta vazia da IA");
   }
-  return { [campo]: String(valor) };
+  return { [campo]: valor };
 }
 
 // ── Explicação de um tema (para o criador ler antes de gerar) ──────────────
